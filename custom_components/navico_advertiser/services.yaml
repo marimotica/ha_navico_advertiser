@@ -1,0 +1,98 @@
+add_site:
+  fields:
+    id:
+      example: "home_assistant"
+      selector:
+        text:
+    name:
+      required: true
+      example: "Home Assistant"
+      selector:
+        text:
+    url:
+      required: true
+      example: "http://172.30.11.54:8123/"
+      selector:
+        text:
+    icon:
+      required: true
+      example: "http://172.30.11.54:8123/favicon.ico"
+      selector:
+        text:
+    description:
+      example: "Home Assistant on HAOS"
+      selector:
+        text:
+    language:
+      default: "en"
+      selector:
+        text:
+    source:
+      example: "Home Assistant"
+      selector:
+        text:
+    progress_bar:
+      default: true
+      selector:
+        boolean:
+    only_show_on_client_ip:
+      default: true
+      selector:
+        boolean:
+
+update_site:
+  fields:
+    id:
+      required: true
+      example: "home_assistant"
+      selector:
+        text:
+    name:
+      required: true
+      example: "Home Assistant"
+      selector:
+        text:
+    url:
+      required: true
+      example: "http://172.30.11.54:8123/"
+      selector:
+        text:
+    icon:
+      required: true
+      example: "http://172.30.11.54:8123/favicon.ico"
+      selector:
+        text:
+    description:
+      example: "Home Assistant on HAOS"
+      selector:
+        text:
+    language:
+      default: "en"
+      selector:
+        text:
+    source:
+      example: "Home Assistant"
+      selector:
+        text:
+    progress_bar:
+      default: true
+      selector:
+        boolean:
+    only_show_on_client_ip:
+      default: true
+      selector:
+        boolean:
+
+remove_site:
+  fields:
+    id:
+      required: true
+      example: "home_assistant"
+      selector:
+        text:
+
+reload:
+
+send_now:
+
+export_state:

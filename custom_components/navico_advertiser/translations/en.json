@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Navico Advertiser",
+        "description": "Advertise Home Assistant or other local web apps to Navico/B&G/Simrad MFD browser panels.",
+        "data": {
+          "interface": "Interface name",
+          "advertise_ip": "Advertised IPv4 address",
+          "interval": "Advertisement interval in seconds"
+        }
+      }
+    },
+    "error": {
+      "invalid_ip": "Enter a valid IPv4 address."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Navico Advertiser Options",
+        "description": "Update the advertised interface/IP and edit advertised sites as JSON. Services can also add, update, or remove sites at runtime.",
+        "data": {
+          "interface": "Interface name",
+          "advertise_ip": "Advertised IPv4 address",
+          "interval": "Advertisement interval in seconds",
+          "sites": "Advertised sites JSON"
+        }
+      }
+    },
+    "error": {
+      "invalid_ip": "Enter a valid IPv4 address.",
+      "invalid_json": "Enter valid JSON.",
+      "sites_must_be_list": "Sites must be a JSON list.",
+      "site_required_fields": "Each site needs name, url, and icon.",
+      "site_id_required": "Each site needs an id.",
+      "duplicate_site_id": "Each site id must be unique."
+    }
+  }
+}

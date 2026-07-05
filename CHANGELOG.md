@@ -1,0 +1,8 @@
+# Changelog
+
+## 0.1.0
+
+- Initial Navico MFD UDP multicast advertiser custom integration.
+- Adds config flow for interface/IP and interval.
+- Creates a default Home Assistant advertised site.
+- Adds services to add, update, remove, reload, send, and export advertised sites.

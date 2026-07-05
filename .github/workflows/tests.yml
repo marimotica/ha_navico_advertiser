@@ -1,0 +1,50 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+    tags:
+      - "v*"
+  pull_request:
+
+env:
+  DEFAULT_PYTHON: "3.12"
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    name: Run tests
+    steps:
+      - name: Check out code from GitHub
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Python ${{ env.DEFAULT_PYTHON }}
+        uses: actions/setup-python@v5.3.0
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+
+      - name: Install dependencies
+        run: |
+          pip install --constraint=.github/workflows/constraints.txt pip
+          pip install -r requirements_test.txt
+
+      - name: Run tests
+        run: |
+          pytest \
+            --timeout=10 \
+            --durations=10 \
+            -n auto \
+            --cov custom_components.navico_advertiser \
+            --cov-report xml \
+            --cov-report term-missing \
+            -o console_output_style=count \
+            -p no:sugar \
+            tests
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
