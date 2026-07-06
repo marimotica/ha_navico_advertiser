@@ -10,7 +10,9 @@ from custom_components.navico_advertiser.config_flow import default_site, normal
 
 def test_build_announcement() -> None:
     """Test building a Navico announcement payload."""
-    payload = json.loads(build_announcement("172.30.11.54", default_site("172.30.11.54")))
+    payload = json.loads(
+        build_announcement("172.30.11.54", default_site("172.30.11.54"))
+    )
 
     assert payload["Version"] == "1"
     assert payload["Source"] == "Home Assistant"

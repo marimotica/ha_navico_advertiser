@@ -101,9 +101,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: NavicoConfigEntry) -> b
     return True
 
 
-async def _async_update_listener(
-    hass: HomeAssistant, entry: NavicoConfigEntry
-) -> None:
+async def _async_update_listener(hass: HomeAssistant, entry: NavicoConfigEntry) -> None:
     """Apply updated options without restarting Home Assistant."""
     entry_data = hass.data[DOMAIN][entry.entry_id]
     advertiser: NavicoAdvertiser = entry_data["advertiser"]

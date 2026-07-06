@@ -52,9 +52,13 @@ async def test_config_flow_user_step(hass: HomeAssistant) -> None:
 
 async def test_config_flow_user_step_creates_entry(hass: HomeAssistant) -> None:
     """Test that submitting the user step creates an entry."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    with patch(
+        "custom_components.navico_advertiser.config_flow.get_default_ip",
+        return_value="172.30.11.54",
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
@@ -73,9 +77,13 @@ async def test_config_flow_user_step_creates_entry(hass: HomeAssistant) -> None:
 
 async def test_config_flow_user_step_invalid_ip(hass: HomeAssistant) -> None:
     """Test that invalid IP shows an error."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    with patch(
+        "custom_components.navico_advertiser.config_flow.get_default_ip",
+        return_value="172.30.11.54",
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
@@ -95,4 +103,5 @@ def test_sites_to_json_roundtrip() -> None:
 
 def test_get_interface_ip_missing() -> None:
     """Test missing interface IP lookup."""
-    assert get_interface_ip("definitely_missing") is None
+    with patch("socket.socket", side_effect=OSError):
+        assert get_interface_ip("definitely_missing") is None
