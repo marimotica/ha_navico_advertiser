@@ -167,7 +167,11 @@ class NavicoAdvertiserConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     options={CONF_SITES: [default_site(advertise_ip)]},
                 )
 
-        default_ip = get_default_ip()
+        default_ip = (
+            str(user_input.get(CONF_ADVERTISE_IP, ""))
+            if user_input is not None
+            else get_default_ip()
+        )
 
         return self.async_show_form(
             step_id="user",
