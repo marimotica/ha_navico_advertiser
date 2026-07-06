@@ -149,7 +149,6 @@ class NavicoAdvertiserConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured()
 
         errors: dict[str, str] = {}
-        default_ip = get_default_ip()
 
         if user_input is not None:
             try:
@@ -167,6 +166,8 @@ class NavicoAdvertiserConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     },
                     options={CONF_SITES: [default_site(advertise_ip)]},
                 )
+
+        default_ip = get_default_ip()
 
         return self.async_show_form(
             step_id="user",
