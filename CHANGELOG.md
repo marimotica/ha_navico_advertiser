@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.5
+
+- Change `remove_site` to remove only one matching site id and fail if the id is absent.
+- Restore the default Home Assistant site for old entries that have no stored site list.
+
 ## 0.1.4
 
 - Fix lint issue in `add_site` service implementation.

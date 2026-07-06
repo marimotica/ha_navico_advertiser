@@ -14,7 +14,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
 from .advertiser import AdvertiserConfig, NavicoAdvertiser
-from .config_flow import normalize_site, sites_to_json
+from .config_flow import default_site, normalize_site, sites_to_json
 from .const import (
     CONF_ADVERTISE_IP,
     CONF_INTERFACE,
@@ -140,7 +140,7 @@ def _register_services(hass: HomeAssistant) -> None:
     async def async_remove_site(call: ServiceCall) -> None:
         entry = _get_single_entry(hass)
         site_id = call.data[SITE_ID]
-        sites = [site for site in _entry_sites(entry) if site[SITE_ID] != site_id]
+        sites = remove_site_by_id(_entry_sites(entry), site_id)
         _update_sites(hass, entry, sites)
 
     async def async_reload(call: ServiceCall) -> None:
@@ -198,7 +198,13 @@ def _entry_config(entry: NavicoConfigEntry) -> AdvertiserConfig:
 
 def _entry_sites(entry: NavicoConfigEntry) -> list[dict[str, Any]]:
     """Return configured advertised sites."""
-    return list(entry.options.get(CONF_SITES, entry.data.get(CONF_SITES, [])))
+    if CONF_SITES in entry.options:
+        return list(entry.options[CONF_SITES])
+    if CONF_SITES in entry.data:
+        return list(entry.data[CONF_SITES])
+    if CONF_ADVERTISE_IP in entry.data:
+        return [default_site(entry.data[CONF_ADVERTISE_IP])]
+    return []
 
 
 def site_for_add(
@@ -230,6 +236,16 @@ def _unique_site_id(site_id: str, existing_ids: set[str]) -> str:
         candidate = f"{base}_{counter}"
         counter += 1
     return candidate
+
+
+def remove_site_by_id(
+    sites: list[dict[str, Any]], site_id: str
+) -> list[dict[str, Any]]:
+    """Remove one site matching site_id and preserve all other sites."""
+    for index, site in enumerate(sites):
+        if site[SITE_ID] == site_id:
+            return [*sites[:index], *sites[index + 1 :]]
+    raise HomeAssistantError(f"Unknown site id: {site_id}")
 
 
 def _update_sites(
