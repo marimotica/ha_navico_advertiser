@@ -16,6 +16,7 @@ A Home Assistant custom integration that advertises Home Assistant and other loc
 - **Host-Network Friendly**: Runs inside Home Assistant and can advertise the HAOS LAN IP directly
 - **Configurable Interface/IP**: Configure the advertised IPv4 address and optional interface label from the integration UI
 - **Multiple Advertised Sites**: Add Home Assistant, dashboards, Signal K, Scheiber, or other local URLs
+- **Compatibility Proxy**: Advertises MFD-safe proxy URLs and rewrites web app responses for older Navico browsers
 - **Runtime Updates**: Add, update, remove, reload, or send advertisements immediately via services
 - **Persistent Options**: Advertised sites persist in the config entry options and can be edited later
 
@@ -53,9 +54,12 @@ A Home Assistant custom integration that advertises Home Assistant and other loc
 2. Enter the interface name for documentation, for example `end0`
 3. Enter the IPv4 address that the MFD can reach, for example `172.30.11.54`
 4. Enter the advertisement interval, normally `10` seconds
-5. The integration creates a default `Home Assistant` advertised site pointing at `http://<advertise_ip>:8123/`
+5. Enter the compatibility proxy port, normally `18099`
+6. The integration creates a default `Home Assistant` advertised site pointing at `http://<advertise_ip>:8123/`
 
 The interface name is currently stored for clarity. The actual multicast interface is selected by binding to the advertised IPv4 address, which is what Navico MFDs validate in the UDP payload.
+
+Advertisements always point at the integration's compatibility proxy, for example `http://172.30.11.54:18099/navico_advertiser/proxy/home_assistant/`. The proxy forwards to the configured site URL and applies MFD compatibility fixes: conditional-cache header stripping, HTML polyfill injection, Signal K fetch/WebSocket URL routing, CSS fallbacks, and a conservative JavaScript downlevel pass.
 
 ### Managing Advertised Sites
 

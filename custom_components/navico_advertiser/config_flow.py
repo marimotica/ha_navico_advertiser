@@ -20,8 +20,10 @@ from .const import (
     CONF_ADVERTISE_IP,
     CONF_INTERFACE,
     CONF_INTERVAL,
+    CONF_PROXY_PORT,
     CONF_SITES,
     DEFAULT_ADVERTISE_INTERVAL,
+    DEFAULT_PROXY_PORT,
     DOMAIN,
     SITE_DESCRIPTION,
     SITE_ICON,
@@ -163,6 +165,9 @@ class NavicoAdvertiserConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_INTERFACE: str(user_input.get(CONF_INTERFACE, "")).strip(),
                         CONF_ADVERTISE_IP: advertise_ip,
                         CONF_INTERVAL: interval,
+                        CONF_PROXY_PORT: int(
+                            user_input.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT)
+                        ),
                     },
                     options={CONF_SITES: [default_site(advertise_ip)]},
                 )
@@ -182,6 +187,9 @@ class NavicoAdvertiserConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(
                         CONF_INTERVAL, default=DEFAULT_ADVERTISE_INTERVAL
                     ): vol.All(vol.Coerce(int), vol.Range(min=1, max=3600)),
+                    vol.Required(
+                        CONF_PROXY_PORT, default=DEFAULT_PROXY_PORT
+                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
                 }
             ),
             errors=errors,
@@ -230,6 +238,9 @@ class NavicoAdvertiserOptionsFlow(config_entries.OptionsFlow):
                         CONF_INTERFACE: str(user_input.get(CONF_INTERFACE, "")).strip(),
                         CONF_ADVERTISE_IP: advertise_ip,
                         CONF_INTERVAL: max(1, int(user_input[CONF_INTERVAL])),
+                        CONF_PROXY_PORT: int(
+                            user_input.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT)
+                        ),
                     },
                     options={CONF_SITES: sites},
                 )
@@ -253,6 +264,12 @@ class NavicoAdvertiserOptionsFlow(config_entries.OptionsFlow):
                             CONF_INTERVAL, DEFAULT_ADVERTISE_INTERVAL
                         ),
                     ): vol.All(vol.Coerce(int), vol.Range(min=1, max=3600)),
+                    vol.Required(
+                        CONF_PROXY_PORT,
+                        default=self._config_entry.data.get(
+                            CONF_PROXY_PORT, DEFAULT_PROXY_PORT
+                        ),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
                     vol.Required(
                         CONF_SITES, default=sites_to_json(current_sites)
                     ): selector.TextSelector(

@@ -7,7 +7,8 @@
         "data": {
           "interface": "Interface name",
           "advertise_ip": "Advertised IPv4 address",
-          "interval": "Advertisement interval in seconds"
+          "interval": "Advertisement interval in seconds",
+          "proxy_port": "Compatibility proxy port"
         }
       }
     },
@@ -24,7 +25,8 @@
           "interface": "Interface name",
           "advertise_ip": "Advertised IPv4 address",
           "interval": "Advertisement interval in seconds",
-          "sites": "Advertised sites JSON"
+          "sites": "Advertised sites JSON",
+          "proxy_port": "Compatibility proxy port"
         }
       }
     },

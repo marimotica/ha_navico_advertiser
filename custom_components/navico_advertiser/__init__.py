@@ -19,7 +19,9 @@ from .const import (
     CONF_ADVERTISE_IP,
     CONF_INTERFACE,
     CONF_INTERVAL,
+    CONF_PROXY_PORT,
     CONF_SITES,
+    DEFAULT_PROXY_PORT,
     DOMAIN,
     SERVICE_ADD_SITE,
     SERVICE_EXPORT_STATE,
@@ -36,6 +38,11 @@ from .const import (
     SITE_PROGRESS_BAR,
     SITE_SOURCE,
     SITE_URL,
+)
+from .proxy import (
+    NavicoProxy,
+    proxied_advertisement_sites,
+    proxy_config_from_entry_data,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -78,16 +85,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: NavicoConfigEntry) -> bo
     """Set up Navico Advertiser from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    advertiser = NavicoAdvertiser(hass, _entry_config(entry), _entry_sites(entry))
-    hass.data[DOMAIN][entry.entry_id] = {"advertiser": advertiser}
+    sites = _entry_sites(entry)
+    proxy = NavicoProxy(hass, proxy_config_from_entry_data(entry.data), sites)
+    await proxy.async_start()
+    advertiser = NavicoAdvertiser(
+        hass,
+        _entry_config(entry),
+        proxied_advertisement_sites(sites, proxy_config_from_entry_data(entry.data)),
+    )
+    hass.data[DOMAIN][entry.entry_id] = {"advertiser": advertiser, "proxy": proxy}
     await advertiser.async_start()
 
-    async def async_stop_advertiser(*_: Any) -> None:
-        """Stop the advertiser when Home Assistant is shutting down."""
+    async def async_stop_runtime(*_: Any) -> None:
+        """Stop runtime tasks when Home Assistant is shutting down."""
         await advertiser.async_stop()
+        await proxy.async_stop()
 
     entry.async_on_unload(
-        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_stop_advertiser)
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_stop_runtime)
     )
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     _register_services(hass)
@@ -99,6 +114,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: NavicoConfigEntry) -> b
     entry_data = hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
     if entry_data is not None:
         await entry_data["advertiser"].async_stop()
+        await entry_data["proxy"].async_stop()
     if not hass.data.get(DOMAIN):
         hass.services.async_remove(DOMAIN, SERVICE_ADD_SITE)
         hass.services.async_remove(DOMAIN, SERVICE_UPDATE_SITE)
@@ -113,7 +129,14 @@ async def _async_update_listener(hass: HomeAssistant, entry: NavicoConfigEntry) 
     """Apply updated options without restarting Home Assistant."""
     entry_data = hass.data[DOMAIN][entry.entry_id]
     advertiser: NavicoAdvertiser = entry_data["advertiser"]
-    advertiser.update(_entry_config(entry), _entry_sites(entry))
+    proxy: NavicoProxy = entry_data["proxy"]
+    sites = _entry_sites(entry)
+    proxy_config = proxy_config_from_entry_data(entry.data)
+    if proxy.update(proxy_config, sites):
+        await proxy.async_restart()
+    advertiser.update(
+        _entry_config(entry), proxied_advertisement_sites(sites, proxy_config)
+    )
     await advertiser.async_send_once()
 
 
@@ -157,6 +180,7 @@ def _register_services(hass: HomeAssistant) -> None:
             "interface": entry.data.get(CONF_INTERFACE, ""),
             "advertise_ip": entry.data[CONF_ADVERTISE_IP],
             "interval": entry.data[CONF_INTERVAL],
+            "proxy_port": entry.data.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT),
             "sites": _entry_sites(entry),
         }
 

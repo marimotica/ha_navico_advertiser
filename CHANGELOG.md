@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+- Add a configurable compatibility proxy for advertised sites.
+- Advertise proxy URLs instead of raw target URLs.
+- Add HTML polyfills, Signal K request routing, header cleanup, CSS fallbacks, and conservative JavaScript downleveling in the proxy.
+
 ## 0.1.6
 
 - Fix test formatting for CI linting.
