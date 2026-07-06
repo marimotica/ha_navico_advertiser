@@ -187,9 +187,9 @@ class NavicoAdvertiserConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(
                         CONF_INTERVAL, default=DEFAULT_ADVERTISE_INTERVAL
                     ): vol.All(vol.Coerce(int), vol.Range(min=1, max=3600)),
-                    vol.Required(
-                        CONF_PROXY_PORT, default=DEFAULT_PROXY_PORT
-                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+                    vol.Required(CONF_PROXY_PORT, default=DEFAULT_PROXY_PORT): vol.All(
+                        vol.Coerce(int), vol.Range(min=1, max=65535)
+                    ),
                 }
             ),
             errors=errors,

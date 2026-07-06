@@ -31,7 +31,9 @@ def test_proxied_advertisement_sites_rewrites_url_and_icon() -> None:
 
     proxied = proxied_advertisement_sites(sites, ProxyConfig("172.30.11.54", 18099))
 
-    assert proxied[0]["url"] == "http://172.30.11.54:18099/navico_advertiser/proxy/anchor/"
+    assert (
+        proxied[0]["url"] == "http://172.30.11.54:18099/navico_advertiser/proxy/anchor/"
+    )
     assert proxied[0]["icon"] == (
         "http://172.30.11.54:18099/navico_advertiser/proxy/anchor/anchoralarm.png"
     )

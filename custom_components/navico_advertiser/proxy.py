@@ -146,7 +146,11 @@ def proxied_icon_url(site: dict[str, Any], config: ProxyConfig) -> str:
         icon_parts.scheme,
         icon_parts.netloc,
     ) == (target_parts.scheme, target_parts.netloc):
-        target_path = target_parts.path if target_parts.path.endswith("/") else target_parts.path + "/"
+        target_path = (
+            target_parts.path
+            if target_parts.path.endswith("/")
+            else target_parts.path + "/"
+        )
         path = icon_parts.path.lstrip("/")
         if icon_parts.path.startswith(target_path):
             path = icon_parts.path[len(target_path) :]
@@ -169,9 +173,9 @@ def target_url_for(site: dict[str, Any], tail: str) -> str:
 
 def inject_html_compatibility(html: str, proxy_base: str) -> str:
     """Inject MFD compatibility scripts into HTML."""
-    html = html.replace('type="module" crossorigin src=', 'src=')
+    html = html.replace('type="module" crossorigin src=', "src=")
     html = html.replace("type='module' crossorigin src=", "src=")
-    html = html.replace('type="module" src=', 'src=')
+    html = html.replace('type="module" src=', "src=")
     html = html.replace("type='module' src=", "src=")
     injection = POLYFILLS_SCRIPT + "\n" + browser_shim_script(proxy_base) + "\n"
     if "</head>" in html:
@@ -283,13 +287,17 @@ class NavicoProxy:
         if self._runner is not None:
             return
         app = web.Application()
-        app.router.add_route("*", f"{PROXY_PREFIX}" + "/{site_id}/{tail:.*}", self._handle)
+        app.router.add_route(
+            "*", f"{PROXY_PREFIX}" + "/{site_id}/{tail:.*}", self._handle
+        )
         app.router.add_route("*", f"{PROXY_PREFIX}" + "/{site_id}", self._handle)
         self._runner = web.AppRunner(app)
         await self._runner.setup()
         self._site = web.TCPSite(self._runner, "0.0.0.0", self.config.proxy_port)
         await self._site.start()
-        _LOGGER.info("Navico compatibility proxy listening on port %s", self.config.proxy_port)
+        _LOGGER.info(
+            "Navico compatibility proxy listening on port %s", self.config.proxy_port
+        )
 
     async def async_stop(self) -> None:
         """Stop proxy server."""
@@ -383,7 +391,9 @@ class NavicoProxy:
                     self._transform_cache[cache_key] = content
                 except RuntimeError as err:
                     _LOGGER.error("JavaScript compatibility transform failed: %s", err)
-                    return web.Response(status=502, text=f"Proxy JavaScript error: {err}")
+                    return web.Response(
+                        status=502, text=f"Proxy JavaScript error: {err}"
+                    )
         elif "text/css" in content_type:
             cache_key = self._cache_key(target, response_headers)
             if cached := self._transform_cache.get(cache_key):
@@ -413,10 +423,15 @@ class NavicoProxy:
         """Proxy a WebSocket connection."""
         ws_server = web.WebSocketResponse()
         await ws_server.prepare(request)
-        target_ws = target.replace("http://", "ws://", 1).replace("https://", "wss://", 1)
+        target_ws = target.replace("http://", "ws://", 1).replace(
+            "https://", "wss://", 1
+        )
         session = async_get_clientsession(self.hass)
         try:
-            async with session.ws_connect(target_ws, timeout=ClientTimeout(total=30)) as ws_client:
+            async with session.ws_connect(
+                target_ws, timeout=ClientTimeout(total=30)
+            ) as ws_client:
+
                 async def client_to_target() -> None:
                     async for msg in ws_server:
                         if msg.type == WSMsgType.TEXT:

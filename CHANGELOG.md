@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- Apply formatter changes for CI linting.
+
 ## 0.2.0
 
 - Add a configurable compatibility proxy for advertised sites.
