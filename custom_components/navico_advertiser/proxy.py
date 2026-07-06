@@ -125,8 +125,8 @@ def proxied_advertisement_sites(
     for site in sites:
         copied = dict(site)
         base = proxy_base_url(config, copied[SITE_ID])
-        copied[SITE_URL] = base
         copied[SITE_ICON] = proxied_icon_url(copied, config)
+        copied[SITE_URL] = base
         out.append(copied)
     return out
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- Fix proxy icon URL rewriting for same-origin target icons.
+
 ## 0.2.1
 
 - Apply formatter changes for CI linting.
