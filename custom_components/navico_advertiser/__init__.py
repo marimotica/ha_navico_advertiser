@@ -125,7 +125,7 @@ def _register_services(hass: HomeAssistant) -> None:
     async def async_add_site(call: ServiceCall) -> None:
         entry = _get_single_entry(hass)
         sites = _entry_sites(entry)
-        site = site_for_add(dict(call.data), sites)
+        site_for_add(dict(call.data), sites)
         _update_sites(hass, entry, sites)
 
     async def async_update_site(call: ServiceCall) -> None:

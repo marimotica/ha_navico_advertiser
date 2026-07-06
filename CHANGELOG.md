@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4
+
+- Fix lint issue in `add_site` service implementation.
+
 ## 0.1.3
 
 - Change `add_site` so it appends new sites instead of replacing an existing site with the same generated id.
