@@ -125,8 +125,7 @@ def _register_services(hass: HomeAssistant) -> None:
     async def async_add_site(call: ServiceCall) -> None:
         entry = _get_single_entry(hass)
         sites = _entry_sites(entry)
-        site = normalize_site(dict(call.data))
-        sites = [item for item in sites if item[SITE_ID] != site[SITE_ID]] + [site]
+        site = site_for_add(dict(call.data), sites)
         _update_sites(hass, entry, sites)
 
     async def async_update_site(call: ServiceCall) -> None:
@@ -200,6 +199,37 @@ def _entry_config(entry: NavicoConfigEntry) -> AdvertiserConfig:
 def _entry_sites(entry: NavicoConfigEntry) -> list[dict[str, Any]]:
     """Return configured advertised sites."""
     return list(entry.options.get(CONF_SITES, entry.data.get(CONF_SITES, [])))
+
+
+def site_for_add(
+    site_data: dict[str, Any], existing_sites: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Build a new site for add_site without replacing existing entries."""
+    explicit_id = bool(str(site_data.get(SITE_ID, "")).strip())
+    site = normalize_site(site_data)
+    existing_ids = {site[SITE_ID] for site in existing_sites}
+
+    if explicit_id and site[SITE_ID] in existing_ids:
+        raise HomeAssistantError(
+            f"Site id already exists: {site[SITE_ID]}. Use update_site to replace it."
+        )
+
+    if not explicit_id:
+        site[SITE_ID] = _unique_site_id(site[SITE_ID], existing_ids)
+
+    existing_sites.append(site)
+    return site
+
+
+def _unique_site_id(site_id: str, existing_ids: set[str]) -> str:
+    """Return a site id that does not exist yet."""
+    base = site_id or "site"
+    candidate = base
+    counter = 2
+    while candidate in existing_ids:
+        candidate = f"{base}_{counter}"
+        counter += 1
+    return candidate
 
 
 def _update_sites(

@@ -72,7 +72,9 @@ You can also use services to add, update, or remove sites without editing JSON m
 
 ### `navico_advertiser.add_site`
 
-Add or replace an advertised site.
+Add an advertised site.
+
+Adds a new advertised site. If `id` is omitted and another site has the same generated id, a unique suffix is added automatically, for example `home_assistant_2`. If `id` is explicitly provided and already exists, the service fails; use `navico_advertiser.update_site` to replace an existing site.
 
 **Fields:**
 - `id` (optional): Stable site id. Generated from `name` if omitted

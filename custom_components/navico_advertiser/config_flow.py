@@ -58,7 +58,7 @@ def normalize_site(site: dict[str, Any]) -> dict[str, Any]:
     name = str(site.get(SITE_NAME, "")).strip()
     url = str(site.get(SITE_URL, site.get(CONF_URL, ""))).strip()
     icon = str(site.get(SITE_ICON, "")).strip()
-    site_id = str(site.get(SITE_ID) or _slugify(name)).strip()
+    site_id = str(site.get(SITE_ID) or slugify(name)).strip()
     return {
         SITE_ID: site_id,
         SITE_NAME: name,
@@ -264,7 +264,7 @@ class NavicoAdvertiserOptionsFlow(config_entries.OptionsFlow):
         )
 
 
-def _slugify(value: str) -> str:
+def slugify(value: str) -> str:
     """Create a stable ASCII slug from a label."""
     slug = "".join(char.lower() if char.isalnum() else "_" for char in value)
     while "__" in slug:
