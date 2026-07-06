@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- Stop the background advertiser cleanly during Home Assistant shutdown.
+
 ## 0.1.1
 
 - Fix options flow compatibility with Home Assistant versions where `OptionsFlow.config_entry` is read-only.

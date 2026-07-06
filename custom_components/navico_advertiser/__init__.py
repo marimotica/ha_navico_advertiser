@@ -8,6 +8,7 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
@@ -81,6 +82,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: NavicoConfigEntry) -> bo
     hass.data[DOMAIN][entry.entry_id] = {"advertiser": advertiser}
     await advertiser.async_start()
 
+    async def async_stop_advertiser(*_: Any) -> None:
+        """Stop the advertiser when Home Assistant is shutting down."""
+        await advertiser.async_stop()
+
+    entry.async_on_unload(
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_stop_advertiser)
+    )
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     _register_services(hass)
     return True
