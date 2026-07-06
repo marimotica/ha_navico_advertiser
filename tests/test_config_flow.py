@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.navico_advertiser.config_flow import (
+    NavicoAdvertiserOptionsFlow,
     default_site,
     get_interface_ip,
     sites_to_json,
@@ -105,3 +106,11 @@ def test_get_interface_ip_missing() -> None:
     """Test missing interface IP lookup."""
     with patch("socket.socket", side_effect=OSError):
         assert get_interface_ip("definitely_missing") is None
+
+
+def test_options_flow_stores_entry_privately() -> None:
+    """Test options flow does not assign Home Assistant's read-only property."""
+    entry = object()
+    flow = NavicoAdvertiserOptionsFlow(entry)  # type: ignore[arg-type]
+
+    assert flow._config_entry is entry

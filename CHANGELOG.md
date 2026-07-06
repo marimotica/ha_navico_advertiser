@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- Fix options flow compatibility with Home Assistant versions where `OptionsFlow.config_entry` is read-only.
+
 ## 0.1.0
 
 - Initial Navico MFD UDP multicast advertiser custom integration.

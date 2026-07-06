@@ -201,15 +201,15 @@ class NavicoAdvertiserOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        self.config_entry = config_entry
+        self._config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Manage options and advertised sites."""
         errors: dict[str, str] = {}
-        current_sites = self.config_entry.options.get(
-            CONF_SITES, self.config_entry.data.get(CONF_SITES, [])
+        current_sites = self._config_entry.options.get(
+            CONF_SITES, self._config_entry.data.get(CONF_SITES, [])
         )
 
         if user_input is not None:
@@ -224,9 +224,9 @@ class NavicoAdvertiserOptionsFlow(config_entries.OptionsFlow):
                     errors[CONF_SITES] = reason
             else:
                 self.hass.config_entries.async_update_entry(
-                    self.config_entry,
+                    self._config_entry,
                     data={
-                        **self.config_entry.data,
+                        **self._config_entry.data,
                         CONF_INTERFACE: str(user_input.get(CONF_INTERFACE, "")).strip(),
                         CONF_ADVERTISE_IP: advertise_ip,
                         CONF_INTERVAL: max(1, int(user_input[CONF_INTERVAL])),
@@ -241,15 +241,15 @@ class NavicoAdvertiserOptionsFlow(config_entries.OptionsFlow):
                 {
                     vol.Optional(
                         CONF_INTERFACE,
-                        default=self.config_entry.data.get(CONF_INTERFACE, ""),
+                        default=self._config_entry.data.get(CONF_INTERFACE, ""),
                     ): str,
                     vol.Required(
                         CONF_ADVERTISE_IP,
-                        default=self.config_entry.data[CONF_ADVERTISE_IP],
+                        default=self._config_entry.data[CONF_ADVERTISE_IP],
                     ): str,
                     vol.Required(
                         CONF_INTERVAL,
-                        default=self.config_entry.data.get(
+                        default=self._config_entry.data.get(
                             CONF_INTERVAL, DEFAULT_ADVERTISE_INTERVAL
                         ),
                     ): vol.All(vol.Coerce(int), vol.Range(min=1, max=3600)),
