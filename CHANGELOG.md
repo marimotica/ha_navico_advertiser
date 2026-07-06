@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6
+
+- Fix test formatting for CI linting.
+
 ## 0.1.5
 
 - Change `remove_site` to remove only one matching site id and fail if the id is absent.

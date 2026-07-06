@@ -6,7 +6,11 @@ import pytest
 
 from homeassistant.exceptions import HomeAssistantError
 
-from custom_components.navico_advertiser import _entry_sites, remove_site_by_id, site_for_add
+from custom_components.navico_advertiser import (
+    _entry_sites,
+    remove_site_by_id,
+    site_for_add,
+)
 
 
 def _site(name: str, site_id: str | None = None) -> dict[str, object]:
