@@ -1,39 +1,47 @@
-"""Tests for Navico advertisement payloads."""
+"""Tests for Navico UDP relay helpers."""
 
 from __future__ import annotations
 
-import json
+from custom_components.navico_advertiser.advertiser import (
+    AdvertiserConfig,
+    rewrite_announcement,
+    rewrite_url,
+)
 
-from custom_components.navico_advertiser.advertiser import build_announcement
-from custom_components.navico_advertiser.config_flow import default_site, normalize_site
 
+def test_rewrite_url_replaces_source_ip_and_port() -> None:
+    """Test URL rewriting from SignalK container to advertised host."""
+    config = AdvertiserConfig(advertise_ip="172.30.11.54", proxy_port=8080)
 
-def test_build_announcement() -> None:
-    """Test building a Navico announcement payload."""
-    payload = json.loads(
-        build_announcement("172.30.11.54", default_site("172.30.11.54"))
+    assert rewrite_url("http://172.30.33.3:8080/app/", "172.30.33.3", config) == (
+        "http://172.30.11.54:8080/app/"
     )
 
-    assert payload["Version"] == "1"
-    assert payload["Source"] == "Home Assistant"
-    assert payload["IP"] == "172.30.11.54"
-    assert payload["FeatureName"] == "Home Assistant"
-    assert payload["URL"] == "http://172.30.11.54:8123/"
-    assert payload["Icon"] == "http://172.30.11.54:8123/favicon.ico"
-    assert payload["OnlyShowOnClientIP"] == "true"
-    assert payload["BrowserPanel"]["Enable"] is True
 
+def test_rewrite_url_keeps_other_hosts() -> None:
+    """Test unrelated URLs are left untouched."""
+    config = AdvertiserConfig(advertise_ip="172.30.11.54", proxy_port=8080)
 
-def test_normalize_site_generates_id() -> None:
-    """Test site normalization."""
-    site = normalize_site(
-        {
-            "name": "Home Assistant Boat",
-            "url": "http://172.30.11.54:8123/",
-            "icon": "http://172.30.11.54:8123/favicon.ico",
-        }
+    assert rewrite_url("http://example.test/icon.png", "172.30.33.3", config) == (
+        "http://example.test/icon.png"
     )
 
-    assert site["id"] == "home_assistant_boat"
-    assert site["language"] == "en"
-    assert site["progress_bar"] is True
+
+def test_rewrite_announcement_rewrites_ip_url_and_icon() -> None:
+    """Test announcement payload rewriting."""
+    payload = {
+        "Version": "1",
+        "Source": "signalk-navico-embedder",
+        "IP": "172.30.33.3",
+        "FeatureName": "Anchor Alarm",
+        "URL": "http://172.30.33.3:8080/hoekens-anchor-alarm/",
+        "Icon": "http://172.30.33.3:8080/hoekens-anchor-alarm/anchoralarm.png",
+    }
+
+    rewritten = rewrite_announcement(
+        payload, AdvertiserConfig(advertise_ip="172.30.11.54", proxy_port=8080)
+    )
+
+    assert rewritten["IP"] == "172.30.11.54"
+    assert rewritten["URL"] == "http://172.30.11.54:8080/hoekens-anchor-alarm/"
+    assert rewritten["Icon"] == "http://172.30.11.54:8080/hoekens-anchor-alarm/anchoralarm.png"

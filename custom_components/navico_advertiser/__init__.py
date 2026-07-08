@@ -2,104 +2,44 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any
-
-import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import config_validation as cv
 
 from .advertiser import AdvertiserConfig, NavicoAdvertiser
-from .config_flow import default_site, normalize_site, sites_to_json
 from .const import (
     CONF_ADVERTISE_IP,
     CONF_INTERFACE,
     CONF_INTERVAL,
+    CONF_LISTEN_IP,
+    CONF_LISTEN_PORT,
     CONF_PROXY_PORT,
-    CONF_SITES,
+    DEFAULT_ADVERTISE_INTERVAL,
+    DEFAULT_LISTEN_IP,
+    DEFAULT_LISTEN_PORT,
     DEFAULT_PROXY_PORT,
     DOMAIN,
-    SERVICE_ADD_SITE,
     SERVICE_EXPORT_STATE,
     SERVICE_RELOAD,
-    SERVICE_REMOVE_SITE,
     SERVICE_SEND_NOW,
-    SERVICE_UPDATE_SITE,
-    SITE_DESCRIPTION,
-    SITE_ICON,
-    SITE_ID,
-    SITE_LANGUAGE,
-    SITE_NAME,
-    SITE_ONLY_SHOW_ON_CLIENT_IP,
-    SITE_PROGRESS_BAR,
-    SITE_SOURCE,
-    SITE_URL,
 )
-from .proxy import (
-    NavicoProxy,
-    proxied_advertisement_sites,
-    proxy_config_from_entry_data,
-)
-
-_LOGGER = logging.getLogger(__name__)
 
 NavicoConfigEntry = ConfigEntry
-
-
-ADD_SITE_SCHEMA = vol.Schema(
-    {
-        vol.Optional(SITE_ID): cv.string,
-        vol.Required(SITE_NAME): cv.string,
-        vol.Required(SITE_URL): cv.url,
-        vol.Required(SITE_ICON): cv.url,
-        vol.Optional(SITE_DESCRIPTION, default=""): cv.string,
-        vol.Optional(SITE_LANGUAGE, default="en"): cv.string,
-        vol.Optional(SITE_SOURCE): cv.string,
-        vol.Optional(SITE_PROGRESS_BAR, default=True): cv.boolean,
-        vol.Optional(SITE_ONLY_SHOW_ON_CLIENT_IP, default=True): cv.boolean,
-    }
-)
-
-UPDATE_SITE_SCHEMA = vol.Schema(
-    {
-        vol.Required(SITE_ID): cv.string,
-        vol.Required(SITE_NAME): cv.string,
-        vol.Required(SITE_URL): cv.url,
-        vol.Required(SITE_ICON): cv.url,
-        vol.Optional(SITE_DESCRIPTION, default=""): cv.string,
-        vol.Optional(SITE_LANGUAGE, default="en"): cv.string,
-        vol.Optional(SITE_SOURCE): cv.string,
-        vol.Optional(SITE_PROGRESS_BAR, default=True): cv.boolean,
-        vol.Optional(SITE_ONLY_SHOW_ON_CLIENT_IP, default=True): cv.boolean,
-    }
-)
-
-REMOVE_SITE_SCHEMA = vol.Schema({vol.Required(SITE_ID): cv.string})
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: NavicoConfigEntry) -> bool:
     """Set up Navico Advertiser from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    sites = _entry_sites(entry)
-    proxy = NavicoProxy(hass, proxy_config_from_entry_data(entry.data), sites)
-    await proxy.async_start()
-    advertiser = NavicoAdvertiser(
-        hass,
-        _entry_config(entry),
-        proxied_advertisement_sites(sites, proxy_config_from_entry_data(entry.data)),
-    )
-    hass.data[DOMAIN][entry.entry_id] = {"advertiser": advertiser, "proxy": proxy}
+    advertiser = NavicoAdvertiser(hass, _entry_config(entry))
+    hass.data[DOMAIN][entry.entry_id] = {"advertiser": advertiser}
     await advertiser.async_start()
 
     async def async_stop_runtime(*_: Any) -> None:
         """Stop runtime tasks when Home Assistant is shutting down."""
         await advertiser.async_stop()
-        await proxy.async_stop()
 
     entry.async_on_unload(
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, async_stop_runtime)
@@ -114,11 +54,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: NavicoConfigEntry) -> b
     entry_data = hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
     if entry_data is not None:
         await entry_data["advertiser"].async_stop()
-        await entry_data["proxy"].async_stop()
     if not hass.data.get(DOMAIN):
-        hass.services.async_remove(DOMAIN, SERVICE_ADD_SITE)
-        hass.services.async_remove(DOMAIN, SERVICE_UPDATE_SITE)
-        hass.services.async_remove(DOMAIN, SERVICE_REMOVE_SITE)
         hass.services.async_remove(DOMAIN, SERVICE_RELOAD)
         hass.services.async_remove(DOMAIN, SERVICE_SEND_NOW)
         hass.services.async_remove(DOMAIN, SERVICE_EXPORT_STATE)
@@ -127,44 +63,16 @@ async def async_unload_entry(hass: HomeAssistant, entry: NavicoConfigEntry) -> b
 
 async def _async_update_listener(hass: HomeAssistant, entry: NavicoConfigEntry) -> None:
     """Apply updated options without restarting Home Assistant."""
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    advertiser: NavicoAdvertiser = entry_data["advertiser"]
-    proxy: NavicoProxy = entry_data["proxy"]
-    sites = _entry_sites(entry)
-    proxy_config = proxy_config_from_entry_data(entry.data)
-    if proxy.update(proxy_config, sites):
-        await proxy.async_restart()
-    advertiser.update(
-        _entry_config(entry), proxied_advertisement_sites(sites, proxy_config)
-    )
+    advertiser: NavicoAdvertiser = hass.data[DOMAIN][entry.entry_id]["advertiser"]
+    if advertiser.update(_entry_config(entry)):
+        await advertiser.async_restart()
     await advertiser.async_send_once()
 
 
 def _register_services(hass: HomeAssistant) -> None:
     """Register integration services once."""
-    if hass.services.has_service(DOMAIN, SERVICE_ADD_SITE):
+    if hass.services.has_service(DOMAIN, SERVICE_RELOAD):
         return
-
-    async def async_add_site(call: ServiceCall) -> None:
-        entry = _get_single_entry(hass)
-        sites = _entry_sites(entry)
-        site_for_add(dict(call.data), sites)
-        _update_sites(hass, entry, sites)
-
-    async def async_update_site(call: ServiceCall) -> None:
-        entry = _get_single_entry(hass)
-        sites = _entry_sites(entry)
-        site = normalize_site(dict(call.data))
-        if not any(item[SITE_ID] == site[SITE_ID] for item in sites):
-            raise HomeAssistantError(f"Unknown site id: {site[SITE_ID]}")
-        sites = [site if item[SITE_ID] == site[SITE_ID] else item for item in sites]
-        _update_sites(hass, entry, sites)
-
-    async def async_remove_site(call: ServiceCall) -> None:
-        entry = _get_single_entry(hass)
-        site_id = call.data[SITE_ID]
-        sites = remove_site_by_id(_entry_sites(entry), site_id)
-        _update_sites(hass, entry, sites)
 
     async def async_reload(call: ServiceCall) -> None:
         entry = _get_single_entry(hass)
@@ -176,23 +84,12 @@ def _register_services(hass: HomeAssistant) -> None:
 
     async def async_export_state(call: ServiceCall) -> dict[str, Any]:
         entry = _get_single_entry(hass)
+        advertiser: NavicoAdvertiser = hass.data[DOMAIN][entry.entry_id]["advertiser"]
         return {
-            "interface": entry.data.get(CONF_INTERFACE, ""),
-            "advertise_ip": entry.data[CONF_ADVERTISE_IP],
-            "interval": entry.data[CONF_INTERVAL],
-            "proxy_port": entry.data.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT),
-            "sites": _entry_sites(entry),
+            "config": _entry_config(entry).__dict__,
+            "cached_announcements": len(advertiser._announcements),
         }
 
-    hass.services.async_register(
-        DOMAIN, SERVICE_ADD_SITE, async_add_site, schema=ADD_SITE_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, SERVICE_UPDATE_SITE, async_update_site, schema=UPDATE_SITE_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, SERVICE_REMOVE_SITE, async_remove_site, schema=REMOVE_SITE_SCHEMA
-    )
     hass.services.async_register(DOMAIN, SERVICE_RELOAD, async_reload)
     hass.services.async_register(DOMAIN, SERVICE_SEND_NOW, async_send_now)
     hass.services.async_register(
@@ -207,76 +104,18 @@ def _get_single_entry(hass: HomeAssistant) -> NavicoConfigEntry:
     """Return the single configured Navico Advertiser entry."""
     entries = hass.config_entries.async_entries(DOMAIN)
     if not entries:
-        raise vol.Invalid("Navico Advertiser is not configured")
+        raise RuntimeError("Navico Advertiser is not configured")
     return entries[0]
 
 
 def _entry_config(entry: NavicoConfigEntry) -> AdvertiserConfig:
-    """Build runtime advertiser config from entry data."""
+    """Build runtime relay config from entry data."""
+    data = entry.data
     return AdvertiserConfig(
-        advertise_ip=entry.data[CONF_ADVERTISE_IP],
-        interface=entry.data.get(CONF_INTERFACE, ""),
-        interval=int(entry.data.get(CONF_INTERVAL, 10)),
+        advertise_ip=data[CONF_ADVERTISE_IP],
+        interface=data.get(CONF_INTERFACE, ""),
+        interval=int(data.get(CONF_INTERVAL, DEFAULT_ADVERTISE_INTERVAL)),
+        listen_ip=data.get(CONF_LISTEN_IP, DEFAULT_LISTEN_IP),
+        listen_port=int(data.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT)),
+        proxy_port=int(data.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT)),
     )
-
-
-def _entry_sites(entry: NavicoConfigEntry) -> list[dict[str, Any]]:
-    """Return configured advertised sites."""
-    if CONF_SITES in entry.options:
-        return list(entry.options[CONF_SITES])
-    if CONF_SITES in entry.data:
-        return list(entry.data[CONF_SITES])
-    if CONF_ADVERTISE_IP in entry.data:
-        return [default_site(entry.data[CONF_ADVERTISE_IP])]
-    return []
-
-
-def site_for_add(
-    site_data: dict[str, Any], existing_sites: list[dict[str, Any]]
-) -> dict[str, Any]:
-    """Build a new site for add_site without replacing existing entries."""
-    explicit_id = bool(str(site_data.get(SITE_ID, "")).strip())
-    site = normalize_site(site_data)
-    existing_ids = {site[SITE_ID] for site in existing_sites}
-
-    if explicit_id and site[SITE_ID] in existing_ids:
-        raise HomeAssistantError(
-            f"Site id already exists: {site[SITE_ID]}. Use update_site to replace it."
-        )
-
-    if not explicit_id:
-        site[SITE_ID] = _unique_site_id(site[SITE_ID], existing_ids)
-
-    existing_sites.append(site)
-    return site
-
-
-def _unique_site_id(site_id: str, existing_ids: set[str]) -> str:
-    """Return a site id that does not exist yet."""
-    base = site_id or "site"
-    candidate = base
-    counter = 2
-    while candidate in existing_ids:
-        candidate = f"{base}_{counter}"
-        counter += 1
-    return candidate
-
-
-def remove_site_by_id(
-    sites: list[dict[str, Any]], site_id: str
-) -> list[dict[str, Any]]:
-    """Remove one site matching site_id and preserve all other sites."""
-    for index, site in enumerate(sites):
-        if site[SITE_ID] == site_id:
-            return [*sites[:index], *sites[index + 1 :]]
-    raise HomeAssistantError(f"Unknown site id: {site_id}")
-
-
-def _update_sites(
-    hass: HomeAssistant, entry: NavicoConfigEntry, sites: list[dict[str, Any]]
-) -> None:
-    """Persist updated site list and notify the running advertiser."""
-    hass.config_entries.async_update_entry(
-        entry, options={**entry.options, CONF_SITES: sites}
-    )
-    _LOGGER.debug("Updated Navico advertised sites: %s", sites_to_json(sites))

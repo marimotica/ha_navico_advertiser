@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ipaddress
-import json
 import socket
 import struct
 from typing import Any
@@ -11,93 +10,22 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.const import CONF_URL
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import selector
 
 from .const import (
     CONF_ADVERTISE_IP,
     CONF_INTERFACE,
     CONF_INTERVAL,
+    CONF_LISTEN_IP,
+    CONF_LISTEN_PORT,
     CONF_PROXY_PORT,
-    CONF_SITES,
     DEFAULT_ADVERTISE_INTERVAL,
+    DEFAULT_LISTEN_IP,
+    DEFAULT_LISTEN_PORT,
     DEFAULT_PROXY_PORT,
     DOMAIN,
-    SITE_DESCRIPTION,
-    SITE_ICON,
-    SITE_ID,
-    SITE_LANGUAGE,
-    SITE_NAME,
-    SITE_ONLY_SHOW_ON_CLIENT_IP,
-    SITE_PROGRESS_BAR,
-    SITE_SOURCE,
-    SITE_URL,
 )
-
-
-def default_site(advertise_ip: str) -> dict[str, Any]:
-    """Return the default Home Assistant advertisement site."""
-    base_url = f"http://{advertise_ip}:8123/"
-    return normalize_site(
-        {
-            SITE_ID: "home_assistant",
-            SITE_NAME: "Home Assistant",
-            SITE_DESCRIPTION: "Home Assistant on HAOS",
-            SITE_URL: base_url,
-            SITE_ICON: f"{base_url}favicon.ico",
-            SITE_LANGUAGE: "en",
-            SITE_SOURCE: "Home Assistant",
-            SITE_PROGRESS_BAR: True,
-            SITE_ONLY_SHOW_ON_CLIENT_IP: True,
-        }
-    )
-
-
-def normalize_site(site: dict[str, Any]) -> dict[str, Any]:
-    """Normalize one advertised site definition."""
-    name = str(site.get(SITE_NAME, "")).strip()
-    url = str(site.get(SITE_URL, site.get(CONF_URL, ""))).strip()
-    icon = str(site.get(SITE_ICON, "")).strip()
-    site_id = str(site.get(SITE_ID) or slugify(name)).strip()
-    return {
-        SITE_ID: site_id,
-        SITE_NAME: name,
-        SITE_DESCRIPTION: str(site.get(SITE_DESCRIPTION, "")).strip(),
-        SITE_URL: url,
-        SITE_ICON: icon,
-        SITE_LANGUAGE: str(site.get(SITE_LANGUAGE) or "en").strip() or "en",
-        SITE_SOURCE: str(site.get(SITE_SOURCE) or "Home Assistant").strip(),
-        SITE_PROGRESS_BAR: bool(site.get(SITE_PROGRESS_BAR, True)),
-        SITE_ONLY_SHOW_ON_CLIENT_IP: bool(site.get(SITE_ONLY_SHOW_ON_CLIENT_IP, True)),
-    }
-
-
-def validate_sites_json(value: str) -> list[dict[str, Any]]:
-    """Parse and validate advertised sites JSON."""
-    try:
-        parsed = json.loads(value)
-    except json.JSONDecodeError as err:
-        raise vol.Invalid("invalid_json") from err
-    if not isinstance(parsed, list):
-        raise vol.Invalid("sites_must_be_list")
-    sites = [normalize_site(item) for item in parsed]
-    seen: set[str] = set()
-    for site in sites:
-        if not site[SITE_ID]:
-            raise vol.Invalid("site_id_required")
-        if not site[SITE_NAME] or not site[SITE_URL] or not site[SITE_ICON]:
-            raise vol.Invalid("site_required_fields")
-        if site[SITE_ID] in seen:
-            raise vol.Invalid("duplicate_site_id")
-        seen.add(site[SITE_ID])
-    return sites
-
-
-def sites_to_json(sites: list[dict[str, Any]]) -> str:
-    """Serialize sites for the options flow text editor."""
-    return json.dumps(sites, indent=2, sort_keys=True)
 
 
 def validate_ip(value: str) -> str:
@@ -151,47 +79,22 @@ class NavicoAdvertiserConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured()
 
         errors: dict[str, str] = {}
-
         if user_input is not None:
             try:
-                advertise_ip = validate_ip(user_input[CONF_ADVERTISE_IP])
+                data = _validated_config(user_input)
             except vol.Invalid:
                 errors[CONF_ADVERTISE_IP] = "invalid_ip"
             else:
-                interval = max(1, int(user_input[CONF_INTERVAL]))
-                return self.async_create_entry(
-                    title="Navico Advertiser",
-                    data={
-                        CONF_INTERFACE: str(user_input.get(CONF_INTERFACE, "")).strip(),
-                        CONF_ADVERTISE_IP: advertise_ip,
-                        CONF_INTERVAL: interval,
-                        CONF_PROXY_PORT: int(
-                            user_input.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT)
-                        ),
-                    },
-                    options={CONF_SITES: [default_site(advertise_ip)]},
-                )
+                return self.async_create_entry(title="Navico Advertiser", data=data)
 
         default_ip = (
             str(user_input.get(CONF_ADVERTISE_IP, ""))
             if user_input is not None
             else get_default_ip()
         )
-
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(CONF_INTERFACE, default="end0"): str,
-                    vol.Required(CONF_ADVERTISE_IP, default=default_ip): str,
-                    vol.Required(
-                        CONF_INTERVAL, default=DEFAULT_ADVERTISE_INTERVAL
-                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=3600)),
-                    vol.Required(CONF_PROXY_PORT, default=DEFAULT_PROXY_PORT): vol.All(
-                        vol.Coerce(int), vol.Range(min=1, max=65535)
-                    ),
-                }
-            ),
+            data_schema=_schema(default_ip),
             errors=errors,
         )
 
@@ -214,76 +117,57 @@ class NavicoAdvertiserOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Manage options and advertised sites."""
+        """Manage options."""
         errors: dict[str, str] = {}
-        current_sites = self._config_entry.options.get(
-            CONF_SITES, self._config_entry.data.get(CONF_SITES, [])
-        )
-
         if user_input is not None:
             try:
-                advertise_ip = validate_ip(user_input[CONF_ADVERTISE_IP])
-                sites = validate_sites_json(user_input[CONF_SITES])
-            except vol.Invalid as err:
-                reason = str(err) or "invalid_options"
-                if reason == "invalid_ip":
-                    errors[CONF_ADVERTISE_IP] = reason
-                else:
-                    errors[CONF_SITES] = reason
+                data = _validated_config(user_input)
+            except vol.Invalid:
+                errors[CONF_ADVERTISE_IP] = "invalid_ip"
             else:
-                self.hass.config_entries.async_update_entry(
-                    self._config_entry,
-                    data={
-                        **self._config_entry.data,
-                        CONF_INTERFACE: str(user_input.get(CONF_INTERFACE, "")).strip(),
-                        CONF_ADVERTISE_IP: advertise_ip,
-                        CONF_INTERVAL: max(1, int(user_input[CONF_INTERVAL])),
-                        CONF_PROXY_PORT: int(
-                            user_input.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT)
-                        ),
-                    },
-                    options={CONF_SITES: sites},
-                )
+                self.hass.config_entries.async_update_entry(self._config_entry, data=data)
                 return self.async_create_entry(title="", data={})
 
+        data = self._config_entry.data
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_INTERFACE,
-                        default=self._config_entry.data.get(CONF_INTERFACE, ""),
-                    ): str,
-                    vol.Required(
-                        CONF_ADVERTISE_IP,
-                        default=self._config_entry.data[CONF_ADVERTISE_IP],
-                    ): str,
-                    vol.Required(
-                        CONF_INTERVAL,
-                        default=self._config_entry.data.get(
-                            CONF_INTERVAL, DEFAULT_ADVERTISE_INTERVAL
-                        ),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=3600)),
-                    vol.Required(
-                        CONF_PROXY_PORT,
-                        default=self._config_entry.data.get(
-                            CONF_PROXY_PORT, DEFAULT_PROXY_PORT
-                        ),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-                    vol.Required(
-                        CONF_SITES, default=sites_to_json(current_sites)
-                    ): selector.TextSelector(
-                        selector.TextSelectorConfig(multiline=True)
-                    ),
-                }
-            ),
+            data_schema=_schema(data.get(CONF_ADVERTISE_IP, get_default_ip()), data),
             errors=errors,
         )
 
 
-def slugify(value: str) -> str:
-    """Create a stable ASCII slug from a label."""
-    slug = "".join(char.lower() if char.isalnum() else "_" for char in value)
-    while "__" in slug:
-        slug = slug.replace("__", "_")
-    return slug.strip("_")
+def _validated_config(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Validate and normalize config entry data."""
+    return {
+        CONF_INTERFACE: str(user_input.get(CONF_INTERFACE, "")).strip(),
+        CONF_ADVERTISE_IP: validate_ip(user_input[CONF_ADVERTISE_IP]),
+        CONF_INTERVAL: int(user_input.get(CONF_INTERVAL, DEFAULT_ADVERTISE_INTERVAL)),
+        CONF_LISTEN_IP: validate_ip(user_input.get(CONF_LISTEN_IP, DEFAULT_LISTEN_IP)),
+        CONF_LISTEN_PORT: int(user_input.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT)),
+        CONF_PROXY_PORT: int(user_input.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT)),
+    }
+
+
+def _schema(default_ip: str, data: dict[str, Any] | None = None) -> vol.Schema:
+    """Return config/options schema."""
+    data = data or {}
+    return vol.Schema(
+        {
+            vol.Optional(CONF_INTERFACE, default=data.get(CONF_INTERFACE, "end0")): str,
+            vol.Required(
+                CONF_ADVERTISE_IP, default=data.get(CONF_ADVERTISE_IP, default_ip)
+            ): str,
+            vol.Required(
+                CONF_PROXY_PORT, default=data.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT)
+            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+            vol.Required(
+                CONF_INTERVAL, default=data.get(CONF_INTERVAL, DEFAULT_ADVERTISE_INTERVAL)
+            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=3600)),
+            vol.Required(
+                CONF_LISTEN_IP, default=data.get(CONF_LISTEN_IP, DEFAULT_LISTEN_IP)
+            ): str,
+            vol.Required(
+                CONF_LISTEN_PORT, default=data.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT)
+            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+        }
+    )

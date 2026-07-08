@@ -1,4 +1,4 @@
-"""UDP multicast advertiser for Navico MFD browser tiles."""
+"""UDP multicast relay for Navico MFD browser tile announcements."""
 
 from __future__ import annotations
 
@@ -9,23 +9,18 @@ import logging
 import socket
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from homeassistant.core import HomeAssistant, callback
 
 from .const import (
     DEFAULT_ADVERTISE_INTERVAL,
+    DEFAULT_LISTEN_IP,
+    DEFAULT_LISTEN_PORT,
     DEFAULT_MULTICAST_GROUP,
     DEFAULT_MULTICAST_PORT,
-    DEFAULT_SOURCE,
+    DEFAULT_PROXY_PORT,
     DEFAULT_TTL,
-    SITE_DESCRIPTION,
-    SITE_ICON,
-    SITE_LANGUAGE,
-    SITE_NAME,
-    SITE_ONLY_SHOW_ON_CLIENT_IP,
-    SITE_PROGRESS_BAR,
-    SITE_SOURCE,
-    SITE_URL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,99 +28,124 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class AdvertiserConfig:
-    """Runtime advertiser configuration."""
+    """Runtime UDP relay configuration."""
 
     advertise_ip: str
     interface: str = ""
     interval: int = DEFAULT_ADVERTISE_INTERVAL
+    listen_ip: str = DEFAULT_LISTEN_IP
+    listen_port: int = DEFAULT_LISTEN_PORT
     multicast_group: str = DEFAULT_MULTICAST_GROUP
     multicast_port: int = DEFAULT_MULTICAST_PORT
+    proxy_port: int = DEFAULT_PROXY_PORT
     ttl: int = DEFAULT_TTL
 
 
-def build_announcement(advertise_ip: str, site: dict[str, Any]) -> str:
-    """Build one Navico MFD advertisement JSON payload."""
-    name = str(site[SITE_NAME])
-    language = str(site.get(SITE_LANGUAGE) or "en")
-    source = str(site.get(SITE_SOURCE) or DEFAULT_SOURCE)
-    description = str(site.get(SITE_DESCRIPTION) or "")
-    progress_bar = bool(site.get(SITE_PROGRESS_BAR, True))
-    only_show = site.get(SITE_ONLY_SHOW_ON_CLIENT_IP, True)
+def rewrite_announcement(payload: dict[str, Any], config: AdvertiserConfig) -> dict[str, Any]:
+    """Rewrite a SignalK Navico announcement for the boat LAN."""
+    rewritten = json.loads(json.dumps(payload))
+    source_ip = str(rewritten.get("IP") or "")
+    rewritten["IP"] = config.advertise_ip
+    for key in ("URL", "Icon"):
+        if isinstance(rewritten.get(key), str):
+            rewritten[key] = rewrite_url(rewritten[key], source_ip, config)
+    return rewritten
 
-    payload = {
-        "Version": "1",
-        "Source": source,
-        "IP": advertise_ip,
-        "FeatureName": name,
-        "Text": [
-            {
-                "Language": language,
-                "Name": name,
-                "Description": description,
-            }
-        ],
-        "Icon": str(site[SITE_ICON]),
-        "URL": str(site[SITE_URL]),
-        "OnlyShowOnClientIP": "true" if only_show else "false",
-        "BrowserPanel": {
-            "Enable": True,
-            "ProgressBarEnable": progress_bar,
-            "MenuText": [{"Language": language, "Name": name}],
-        },
-    }
-    return json.dumps(payload, separators=(",", ":"))
+
+def rewrite_url(url: str, source_ip: str, config: AdvertiserConfig) -> str:
+    """Rewrite one URL from the SignalK container to the advertised host."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return url
+    if parts.scheme not in ("http", "https") or not parts.netloc:
+        return url
+    if source_ip and parts.hostname != source_ip:
+        return url
+    netloc = config.advertise_ip
+    if config.proxy_port:
+        netloc = f"{netloc}:{config.proxy_port}"
+    return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
 
 
 class NavicoAdvertiser:
-    """Send Navico MFD UDP multicast advertisements in the background."""
+    """Relay SignalK Navico UDP advertisements onto the boat LAN."""
 
     def __init__(
         self,
         hass: HomeAssistant,
         config: AdvertiserConfig,
-        sites: list[dict[str, Any]],
     ) -> None:
-        """Initialize advertiser."""
+        """Initialize relay."""
         self.hass = hass
         self.config = config
-        self.sites = sites
-        self._task: asyncio.Task[None] | None = None
+        self._transport: asyncio.DatagramTransport | None = None
+        self._rebroadcast_task: asyncio.Task[None] | None = None
         self._stopped = asyncio.Event()
+        self._announcements: dict[str, bytes] = {}
 
     @property
     def running(self) -> bool:
-        """Return whether the background task is running."""
-        return self._task is not None and not self._task.done()
+        """Return whether the UDP listener is running."""
+        return self._transport is not None
 
     @callback
-    def update(self, config: AdvertiserConfig, sites: list[dict[str, Any]]) -> None:
-        """Update runtime configuration used by the next send cycle."""
+    def update(self, config: AdvertiserConfig) -> bool:
+        """Update runtime configuration. Return true when listener must restart."""
+        restart = (
+            config.listen_ip != self.config.listen_ip
+            or config.listen_port != self.config.listen_port
+        )
         self.config = config
-        self.sites = sites
+        return restart
 
     async def async_start(self) -> None:
-        """Start background advertisement task."""
+        """Start UDP listener and rebroadcast task."""
         if self.running:
             return
         self._stopped.clear()
-        self._task = self.hass.async_create_task(self._async_run())
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind((self.config.listen_ip, self.config.listen_port))
+        sock.setblocking(False)
+        membership = socket.inet_aton(self.config.multicast_group) + socket.inet_aton("0.0.0.0")
+        with contextlib.suppress(OSError):
+            sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, membership)
+        loop = asyncio.get_running_loop()
+        self._transport, _ = await loop.create_datagram_endpoint(
+            lambda: _NavicoRelayProtocol(self), sock=sock
+        )
+        self._rebroadcast_task = self.hass.async_create_task(self._async_rebroadcast())
+        _LOGGER.info(
+            "Listening for Navico announcements on %s:%s",
+            self.config.listen_ip,
+            self.config.listen_port,
+        )
 
     async def async_stop(self) -> None:
-        """Stop background advertisement task."""
+        """Stop UDP listener and rebroadcast task."""
         self._stopped.set()
-        if self._task is None:
-            return
-        self._task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await self._task
-        self._task = None
+        if self._transport is not None:
+            self._transport.close()
+            self._transport = None
+        if self._rebroadcast_task is not None:
+            self._rebroadcast_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._rebroadcast_task
+            self._rebroadcast_task = None
+
+    async def async_restart(self) -> None:
+        """Restart UDP listener."""
+        await self.async_stop()
+        await self.async_start()
 
     async def async_send_once(self) -> None:
-        """Send all currently configured site advertisements once."""
-        await self.hass.async_add_executor_job(self._send_once)
+        """Send all cached rewritten advertisements once."""
+        for data in list(self._announcements.values()):
+            await self.hass.async_add_executor_job(self._send_payload, data)
 
-    async def _async_run(self) -> None:
-        """Run advertisement loop."""
+    async def _async_rebroadcast(self) -> None:
+        """Periodically rebroadcast cached rewritten announcements."""
         while not self._stopped.is_set():
             await self.async_send_once()
             with contextlib.suppress(asyncio.TimeoutError):
@@ -133,11 +153,26 @@ class NavicoAdvertiser:
                     self._stopped.wait(), timeout=max(1, self.config.interval)
                 )
 
-    def _send_once(self) -> None:
-        """Send all advertisements synchronously from an executor."""
-        if not self.sites:
+    async def async_handle_packet(self, data: bytes, addr: tuple[str, int]) -> None:
+        """Handle one incoming SignalK plugin packet."""
+        try:
+            payload = json.loads(data.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
             return
+        if not isinstance(payload, dict):
+            return
+        if payload.get("IP") == self.config.advertise_ip:
+            return
+        if "URL" not in payload or "FeatureName" not in payload:
+            return
+        rewritten = rewrite_announcement(payload, self.config)
+        encoded = json.dumps(rewritten, separators=(",", ":")).encode()
+        key = str(rewritten.get("FeatureName") or rewritten.get("URL") or addr)
+        self._announcements[key] = encoded
+        await self.hass.async_add_executor_job(self._send_payload, encoded)
 
+    def _send_payload(self, data: bytes) -> None:
+        """Send one rewritten advertisement synchronously."""
         config = self.config
         try:
             with socket.socket(
@@ -162,9 +197,18 @@ class NavicoAdvertiser:
                     socket.IP_MULTICAST_IF,
                     socket.inet_aton(config.advertise_ip),
                 )
-                sock.bind((config.advertise_ip, 0))
-                for site in self.sites:
-                    data = build_announcement(config.advertise_ip, site).encode()
-                    sock.sendto(data, (config.multicast_group, config.multicast_port))
+                sock.sendto(data, (config.multicast_group, config.multicast_port))
         except OSError as err:
             _LOGGER.warning("Failed to send Navico advertisements: %s", err)
+
+
+class _NavicoRelayProtocol(asyncio.DatagramProtocol):
+    """UDP protocol that forwards packets to the relay."""
+
+    def __init__(self, relay: NavicoAdvertiser) -> None:
+        """Initialize protocol."""
+        self.relay = relay
+
+    def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
+        """Handle one UDP datagram."""
+        self.relay.hass.async_create_task(self.relay.async_handle_packet(data, addr))

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Roll back the HA compatibility proxy and site management features.
+- Refactor the integration into a slim UDP relay for `signalk-navico-embedder` announcements.
+- Rewrite SignalK Docker-internal announcement IP/URL/Icon fields to the configured boat-LAN IP and external proxy port.
+
 ## 0.2.2
 
 - Fix proxy icon URL rewriting for same-origin target icons.
