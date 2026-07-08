@@ -41,7 +41,9 @@ class AdvertiserConfig:
     ttl: int = DEFAULT_TTL
 
 
-def rewrite_announcement(payload: dict[str, Any], config: AdvertiserConfig) -> dict[str, Any]:
+def rewrite_announcement(
+    payload: dict[str, Any], config: AdvertiserConfig
+) -> dict[str, Any]:
     """Rewrite a SignalK Navico announcement for the boat LAN."""
     rewritten = json.loads(json.dumps(payload))
     source_ip = str(rewritten.get("IP") or "")
@@ -108,7 +110,9 @@ class NavicoAdvertiser:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((self.config.listen_ip, self.config.listen_port))
         sock.setblocking(False)
-        membership = socket.inet_aton(self.config.multicast_group) + socket.inet_aton("0.0.0.0")
+        membership = socket.inet_aton(self.config.multicast_group) + socket.inet_aton(
+            "0.0.0.0"
+        )
         with contextlib.suppress(OSError):
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, membership)
         loop = asyncio.get_running_loop()

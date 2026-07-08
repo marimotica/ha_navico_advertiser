@@ -125,7 +125,9 @@ class NavicoAdvertiserOptionsFlow(config_entries.OptionsFlow):
             except vol.Invalid:
                 errors[CONF_ADVERTISE_IP] = "invalid_ip"
             else:
-                self.hass.config_entries.async_update_entry(self._config_entry, data=data)
+                self.hass.config_entries.async_update_entry(
+                    self._config_entry, data=data
+                )
                 return self.async_create_entry(title="", data={})
 
         data = self._config_entry.data
@@ -161,13 +163,15 @@ def _schema(default_ip: str, data: dict[str, Any] | None = None) -> vol.Schema:
                 CONF_PROXY_PORT, default=data.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT)
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
             vol.Required(
-                CONF_INTERVAL, default=data.get(CONF_INTERVAL, DEFAULT_ADVERTISE_INTERVAL)
+                CONF_INTERVAL,
+                default=data.get(CONF_INTERVAL, DEFAULT_ADVERTISE_INTERVAL),
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=3600)),
             vol.Required(
                 CONF_LISTEN_IP, default=data.get(CONF_LISTEN_IP, DEFAULT_LISTEN_IP)
             ): str,
             vol.Required(
-                CONF_LISTEN_PORT, default=data.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT)
+                CONF_LISTEN_PORT,
+                default=data.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT),
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
         }
     )

@@ -44,4 +44,7 @@ def test_rewrite_announcement_rewrites_ip_url_and_icon() -> None:
 
     assert rewritten["IP"] == "172.30.11.54"
     assert rewritten["URL"] == "http://172.30.11.54:8080/hoekens-anchor-alarm/"
-    assert rewritten["Icon"] == "http://172.30.11.54:8080/hoekens-anchor-alarm/anchoralarm.png"
+    assert (
+        rewritten["Icon"]
+        == "http://172.30.11.54:8080/hoekens-anchor-alarm/anchoralarm.png"
+    )

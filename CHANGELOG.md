@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Apply formatter changes for CI linting after the UDP relay refactor.
+
 ## 0.3.0
 
 - Roll back the HA compatibility proxy and site management features.
