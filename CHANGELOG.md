@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2
+
+- Join the Navico multicast group on all host IPv4 interfaces, including HAOS Docker bridge interfaces, so SignalK add-on packets can be received and relayed.
+- Move interface enumeration off the Home Assistant event loop.
+
 ## 0.3.1
 
 - Apply formatter changes for CI linting after the UDP relay refactor.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from custom_components.navico_advertiser.advertiser import (
     AdvertiserConfig,
+    multicast_interface_ips,
     rewrite_announcement,
     rewrite_url,
 )
@@ -48,3 +49,21 @@ def test_rewrite_announcement_rewrites_ip_url_and_icon() -> None:
         rewritten["Icon"]
         == "http://172.30.11.54:8080/hoekens-anchor-alarm/anchoralarm.png"
     )
+
+
+def test_multicast_interface_ips_includes_all_non_loopback(monkeypatch) -> None:
+    """Test multicast joins include Docker and LAN interfaces."""
+    monkeypatch.setattr(
+        "custom_components.navico_advertiser.advertiser.os.listdir",
+        lambda path: ["lo", "hassio", "end0"],
+    )
+    monkeypatch.setattr(
+        "custom_components.navico_advertiser.advertiser.os.path.isdir",
+        lambda path: True,
+    )
+    monkeypatch.setattr(
+        "custom_components.navico_advertiser.advertiser._interface_ip",
+        lambda name: {"hassio": "172.30.32.1", "end0": "172.30.11.54"}.get(name),
+    )
+
+    assert multicast_interface_ips() == ["0.0.0.0", "172.30.32.1", "172.30.11.54"]

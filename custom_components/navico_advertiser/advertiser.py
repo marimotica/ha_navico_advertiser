@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
 import socket
 from dataclasses import dataclass
 from typing import Any
@@ -110,11 +111,13 @@ class NavicoAdvertiser:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((self.config.listen_ip, self.config.listen_port))
         sock.setblocking(False)
-        membership = socket.inet_aton(self.config.multicast_group) + socket.inet_aton(
-            "0.0.0.0"
-        )
-        with contextlib.suppress(OSError):
-            sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, membership)
+        interface_ips = await self.hass.async_add_executor_job(multicast_interface_ips)
+        for interface_ip in interface_ips:
+            membership = socket.inet_aton(self.config.multicast_group) + socket.inet_aton(
+                interface_ip
+            )
+            with contextlib.suppress(OSError):
+                sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, membership)
         loop = asyncio.get_running_loop()
         self._transport, _ = await loop.create_datagram_endpoint(
             lambda: _NavicoRelayProtocol(self), sock=sock
@@ -216,3 +219,38 @@ class _NavicoRelayProtocol(asyncio.DatagramProtocol):
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
         """Handle one UDP datagram."""
         self.relay.hass.async_create_task(self.relay.async_handle_packet(data, addr))
+
+
+def multicast_interface_ips() -> list[str]:
+    """Return IPv4 interface addresses to join multicast on."""
+    ips = ["0.0.0.0"]
+    ips.extend(_linux_interface_ips())
+    return list(dict.fromkeys(ips))
+
+
+def _linux_interface_ips() -> list[str]:
+    """Return IPv4 addresses from Linux /proc net data."""
+    ips: list[str] = []
+    for name in os.listdir("/sys/class/net") if os.path.isdir("/sys/class/net") else []:
+        if name == "lo":
+            continue
+        ip = _interface_ip(name)
+        if ip:
+            ips.append(ip)
+    return ips
+
+
+def _interface_ip(name: str) -> str | None:
+    """Return IPv4 address for an interface name."""
+    try:
+        import fcntl
+        import struct
+    except ImportError:
+        return None
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            data = struct.pack("256s", name[:15].encode())
+            result = fcntl.ioctl(sock.fileno(), 0x8915, data)
+            return socket.inet_ntoa(result[20:24])
+    except OSError:
+        return None
