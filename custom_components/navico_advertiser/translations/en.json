@@ -7,7 +7,6 @@
         "data": {
           "interface": "Output interface name",
           "advertise_ip": "Advertised IPv4 address",
-          "proxy_port": "External SignalK Navico proxy port",
           "interval": "Rebroadcast interval in seconds",
           "listen_ip": "UDP listen address",
           "listen_port": "UDP listen port"
@@ -26,7 +25,6 @@
         "data": {
           "interface": "Output interface name",
           "advertise_ip": "Advertised IPv4 address",
-          "proxy_port": "External SignalK Navico proxy port",
           "interval": "Rebroadcast interval in seconds",
           "listen_ip": "UDP listen address",
           "listen_port": "UDP listen port"

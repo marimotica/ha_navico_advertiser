@@ -41,7 +41,6 @@ async def test_config_flow_user_step_creates_entry(hass: HomeAssistant) -> None:
         user_input={
             "interface": "end0",
             "advertise_ip": "172.30.11.54",
-            "proxy_port": 8080,
             "interval": 10,
             "listen_ip": "0.0.0.0",
             "listen_port": 2053,
@@ -51,7 +50,6 @@ async def test_config_flow_user_step_creates_entry(hass: HomeAssistant) -> None:
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Navico Advertiser"
     assert result["data"]["advertise_ip"] == "172.30.11.54"
-    assert result["data"]["proxy_port"] == 8080
 
 
 async def test_config_flow_user_step_invalid_ip(hass: HomeAssistant) -> None:
@@ -69,7 +67,6 @@ async def test_config_flow_user_step_invalid_ip(hass: HomeAssistant) -> None:
         user_input={
             "interface": "end0",
             "advertise_ip": "bad",
-            "proxy_port": 8080,
             "interval": 10,
             "listen_ip": "0.0.0.0",
             "listen_port": 2053,

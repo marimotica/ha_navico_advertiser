@@ -19,11 +19,9 @@ from .const import (
     CONF_INTERVAL,
     CONF_LISTEN_IP,
     CONF_LISTEN_PORT,
-    CONF_PROXY_PORT,
     DEFAULT_ADVERTISE_INTERVAL,
     DEFAULT_LISTEN_IP,
     DEFAULT_LISTEN_PORT,
-    DEFAULT_PROXY_PORT,
     DOMAIN,
 )
 
@@ -146,7 +144,6 @@ def _validated_config(user_input: dict[str, Any]) -> dict[str, Any]:
         CONF_INTERVAL: int(user_input.get(CONF_INTERVAL, DEFAULT_ADVERTISE_INTERVAL)),
         CONF_LISTEN_IP: validate_ip(user_input.get(CONF_LISTEN_IP, DEFAULT_LISTEN_IP)),
         CONF_LISTEN_PORT: int(user_input.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT)),
-        CONF_PROXY_PORT: int(user_input.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT)),
     }
 
 
@@ -159,9 +156,6 @@ def _schema(default_ip: str, data: dict[str, Any] | None = None) -> vol.Schema:
             vol.Required(
                 CONF_ADVERTISE_IP, default=data.get(CONF_ADVERTISE_IP, default_ip)
             ): str,
-            vol.Required(
-                CONF_PROXY_PORT, default=data.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT)
-            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
             vol.Required(
                 CONF_INTERVAL,
                 default=data.get(CONF_INTERVAL, DEFAULT_ADVERTISE_INTERVAL),

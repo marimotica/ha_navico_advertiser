@@ -15,11 +15,9 @@ from .const import (
     CONF_INTERVAL,
     CONF_LISTEN_IP,
     CONF_LISTEN_PORT,
-    CONF_PROXY_PORT,
     DEFAULT_ADVERTISE_INTERVAL,
     DEFAULT_LISTEN_IP,
     DEFAULT_LISTEN_PORT,
-    DEFAULT_PROXY_PORT,
     DOMAIN,
     SERVICE_EXPORT_STATE,
     SERVICE_RELOAD,
@@ -117,5 +115,4 @@ def _entry_config(entry: NavicoConfigEntry) -> AdvertiserConfig:
         interval=int(data.get(CONF_INTERVAL, DEFAULT_ADVERTISE_INTERVAL)),
         listen_ip=data.get(CONF_LISTEN_IP, DEFAULT_LISTEN_IP),
         listen_port=int(data.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT)),
-        proxy_port=int(data.get(CONF_PROXY_PORT, DEFAULT_PROXY_PORT)),
     )

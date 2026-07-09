@@ -20,7 +20,6 @@ from .const import (
     DEFAULT_LISTEN_PORT,
     DEFAULT_MULTICAST_GROUP,
     DEFAULT_MULTICAST_PORT,
-    DEFAULT_PROXY_PORT,
     DEFAULT_TTL,
 )
 
@@ -38,7 +37,6 @@ class AdvertiserConfig:
     listen_port: int = DEFAULT_LISTEN_PORT
     multicast_group: str = DEFAULT_MULTICAST_GROUP
     multicast_port: int = DEFAULT_MULTICAST_PORT
-    proxy_port: int = DEFAULT_PROXY_PORT
     ttl: int = DEFAULT_TTL
 
 
@@ -66,8 +64,8 @@ def rewrite_url(url: str, source_ip: str, config: AdvertiserConfig) -> str:
     if source_ip and parts.hostname != source_ip:
         return url
     netloc = config.advertise_ip
-    if config.proxy_port:
-        netloc = f"{netloc}:{config.proxy_port}"
+    if parts.port:
+        netloc = f"{netloc}:{parts.port}"
     return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
 
 

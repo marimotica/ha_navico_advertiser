@@ -28,7 +28,6 @@ This integration does not replace that proxy. It only fixes the UDP multicast pa
 
 - `advertise_ip`: HAOS/Raspberry Pi IP on the boat Ethernet, for example `172.30.11.54`.
 - `interface`: Output interface name, for example `end0`.
-- `proxy_port`: External port where the SignalK Navico proxy is reachable from the MFD, usually `8080` if published.
 - `interval`: How often cached announcements are re-broadcast.
 - `listen_ip`: UDP listen address, normally `0.0.0.0`.
 - `listen_port`: UDP listen port, normally `2053`.

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.4
+
+- Remove `proxy_port` handling from the HA relay.
+- Preserve the port advertised by `signalk-navico-embedder` and rewrite only the host/IP.
+
 ## 0.3.3
 
 - Apply formatter changes for CI linting after multicast interface join fix.
