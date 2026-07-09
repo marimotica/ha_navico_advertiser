@@ -113,9 +113,9 @@ class NavicoAdvertiser:
         sock.setblocking(False)
         interface_ips = await self.hass.async_add_executor_job(multicast_interface_ips)
         for interface_ip in interface_ips:
-            membership = socket.inet_aton(self.config.multicast_group) + socket.inet_aton(
-                interface_ip
-            )
+            membership = socket.inet_aton(
+                self.config.multicast_group
+            ) + socket.inet_aton(interface_ip)
             with contextlib.suppress(OSError):
                 sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, membership)
         loop = asyncio.get_running_loop()
