@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 
 from .const import (
@@ -75,10 +76,12 @@ class NavicoAdvertiser:
     def __init__(
         self,
         hass: HomeAssistant,
+        entry: ConfigEntry,
         config: AdvertiserConfig,
     ) -> None:
         """Initialize relay."""
         self.hass = hass
+        self.entry = entry
         self.config = config
         self._transport: asyncio.DatagramTransport | None = None
         self._rebroadcast_task: asyncio.Task[None] | None = None
@@ -120,7 +123,11 @@ class NavicoAdvertiser:
         self._transport, _ = await loop.create_datagram_endpoint(
             lambda: _NavicoRelayProtocol(self), sock=sock
         )
-        self._rebroadcast_task = self.hass.async_create_task(self._async_rebroadcast())
+        # The rebroadcast loop never finishes, so it must be a background task:
+        # a tracked task makes bootstrap wait out its full startup timeout.
+        self._rebroadcast_task = self.entry.async_create_background_task(
+            self.hass, self._async_rebroadcast(), name="navico_advertiser rebroadcast"
+        )
         _LOGGER.info(
             "Listening for Navico announcements on %s:%s",
             self.config.listen_ip,
