@@ -36,16 +36,21 @@ async def test_config_flow_user_step_creates_entry(hass: HomeAssistant) -> None:
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
 
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        user_input={
-            "interface": "end0",
-            "advertise_ip": "172.30.11.54",
-            "interval": 10,
-            "listen_ip": "0.0.0.0",
-            "listen_port": 2053,
-        },
-    )
+    # Creating the entry sets it up; don't open real sockets from a flow test.
+    with patch(
+        "custom_components.navico_advertiser.async_setup_entry",
+        return_value=True,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={
+                "interface": "end0",
+                "advertise_ip": "172.30.11.54",
+                "interval": 10,
+                "listen_ip": "0.0.0.0",
+                "listen_port": 2053,
+            },
+        )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Navico Advertiser"

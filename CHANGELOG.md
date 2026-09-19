@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.5
+
+- Run the periodic rebroadcast loop as a config entry background task. It was a tracked task, so every Home Assistant restart waited out the full 300 s bootstrap timeout ("Setup timed out for bootstrap waiting on ... NavicoAdvertiser._async_rebroadcast") before reaching the started state.
+
 ## 0.3.4
 
 - Remove `proxy_port` handling from the HA relay.

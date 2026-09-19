@@ -31,7 +31,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: NavicoConfigEntry) -> bo
     """Set up Navico Advertiser from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    advertiser = NavicoAdvertiser(hass, _entry_config(entry))
+    advertiser = NavicoAdvertiser(hass, entry, _entry_config(entry))
     hass.data[DOMAIN][entry.entry_id] = {"advertiser": advertiser}
     await advertiser.async_start()
 
