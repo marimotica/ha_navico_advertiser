@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -84,8 +85,8 @@ def _register_services(hass: HomeAssistant) -> None:
         entry = _get_single_entry(hass)
         advertiser: NavicoAdvertiser = hass.data[DOMAIN][entry.entry_id]["advertiser"]
         return {
-            "config": _entry_config(entry).__dict__,
-            "cached_announcements": len(advertiser._announcements),
+            "config": asdict(advertiser.config),
+            "cached_announcements": advertiser.cached_announcements,
         }
 
     hass.services.async_register(DOMAIN, SERVICE_RELOAD, async_reload)

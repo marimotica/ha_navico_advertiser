@@ -93,6 +93,11 @@ class NavicoAdvertiser:
         """Return whether the UDP listener is running."""
         return self._transport is not None
 
+    @property
+    def cached_announcements(self) -> int:
+        """Return the number of cached rewritten announcements."""
+        return len(self._announcements)
+
     @callback
     def update(self, config: AdvertiserConfig) -> bool:
         """Update runtime configuration. Return true when listener must restart."""
